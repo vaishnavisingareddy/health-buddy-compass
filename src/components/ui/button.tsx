@@ -18,12 +18,16 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        hero: "btn-hero hover:opacity-95",
+        soft: "btn-soft hover:opacity-95",
+        chip: "btn-chip hover:bg-accent",
       },
       size: {
         default: "h-10 px-4 py-2",
         sm: "h-9 rounded-md px-3",
         lg: "h-11 rounded-md px-8",
         icon: "h-10 w-10",
+        chip: "h-8 px-3 rounded-full text-xs",
       },
     },
     defaultVariants: {
