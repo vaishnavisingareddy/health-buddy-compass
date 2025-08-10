@@ -5,12 +5,13 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Mic, MicOff, Send, Volume2, VolumeX } from "lucide-react";
+import { Mic, MicOff, Send, Volume2, VolumeX, Loader2 } from "lucide-react";
 import { ConditionKey } from "./conditions-data";
 import { SURGERY_SUGGESTIONS } from "./conditions-data";
+import { getGeminiService, initializeGeminiService, ChatContext } from "@/services/geminiService";
 
 interface ChatbotPanelProps {
-  condition: ConditionKey | null;
+  conditions: ConditionKey[];
   onEarnPoints?: (delta: number) => void;
 }
 
@@ -26,21 +27,81 @@ const QUICK_ASK: string[] = [
   "Safe home remedies",
 ];
 
-function getWarmIntro(condition: ConditionKey): string {
+// Initialize Gemini service
+const initGemini = () => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  console.log('Initializing Gemini with API key:', apiKey ? 'API key found' : 'No API key');
+  if (apiKey && apiKey !== 'your_gemini_api_key_here') {
+    const service = initializeGeminiService(apiKey);
+    console.log('Gemini service initialized:', service ? 'Success' : 'Failed');
+    return service;
+  }
+  console.log('Gemini service not initialized: No valid API key');
+  return null;
+};
+
+function getWarmIntro(conditions: ConditionKey[]): string {
+  // Fallback intros in case Gemini service is not available
+  const primaryCondition = conditions[0];
   const map: Partial<Record<ConditionKey, string>> = {
     pregnant: "I'm so glad you're here. Let's make this journey comfortable and safe.",
     recent_surgery: "Welcome back. Gentle recovery steps can help you heal smoothly.",
     mental_health: "You're not alone. Let's take this one gentle step at a time.",
+    skin: "I understand skin concerns can be frustrating. Let's find gentle, effective solutions together.",
+    diabetes: "Managing diabetes can feel overwhelming, but small steps make a big difference. I'm here to help.",
+    pcos: "PCOS affects everyone differently. Let's find approaches that work specifically for you."
   };
-  return map[condition] ?? "I'm here for you. Let's explore supportive, practical steps together.";
+  
+  if (conditions.length > 1) {
+    const conditionNames = conditions.map(c => c.replace(/_/g, " ")).join(", ");
+    return `I'm here to support you with your ${conditionNames} journey. Let's explore gentle, practical steps together.`;
+  }
+  
+  return map[primaryCondition] ?? "I'm here for you. Let's explore supportive, practical steps together.";
+}
+
+async function makeGeminiResponse(
+  conditions: ConditionKey[], 
+  input: string, 
+  surgeryKind?: string,
+  previousQuestions: string[] = []
+): Promise<string> {
+  console.log('makeGeminiResponse called with:', { conditions, input, surgeryKind });
+  const geminiService = getGeminiService();
+  
+  console.log('Gemini service available:', geminiService ? 'Yes' : 'No');
+  
+  if (!geminiService) {
+    console.log('Using fallback response - no Gemini service');
+    // Fallback to hardcoded responses if Gemini is not available
+    return makeResponse(conditions[0], input, surgeryKind);
+  }
+
+  try {
+    const context: ChatContext = {
+      conditions,
+      surgeryType: surgeryKind,
+      previousQuestions,
+      currentQuestion: input
+    };
+
+    console.log('Calling Gemini with context:', context);
+    const response = await geminiService.generateResponse(context);
+    console.log('Gemini response received:', response);
+    return response;
+  } catch (error) {
+    console.error('Error getting Gemini response:', error);
+    // Fallback to hardcoded response
+    return makeResponse(conditions[0], input, surgeryKind);
+  }
 }
 
 function makeResponse(condition: ConditionKey, input: string, surgeryKind?: string): string {
   const lc = input.toLowerCase();
   const conditionName = condition.replace(/_/g, " ");
 
-  if (condition === "recent_surgery" && surgeryKind) {
-    if (lc.includes("diet") || lc.includes("food")) {
+  if (condition === "recent_surgery" && surgeryKind && surgeryKind.trim() !== "") {
+    if (lc.includes("diet") || lc.includes("food") || lc.includes("avoid")) {
       return `After ${surgeryKind}, choose small, frequent meals. Focus on protein (dal, eggs, yogurt), soft veggies, and hydration. Avoid very spicy or oily foods initially. Sip water often. If nausea appears, try ginger tea. Reach out to your doctor if vomiting or severe pain occurs.`;
     }
   }
@@ -67,7 +128,7 @@ Consult a clinician before new routines, especially if symptoms flare.`;
 - Evening: Device wind-down, gratitude note, aim for consistent sleep \nConsistency > intensity.`;
   }
   if (lc.includes("avoid") || lc.includes("trigger")) {
-    return `Common triggers to minimize:
+    return `Common triggers to minimize for ${conditionName}:
 - Ultra-processed foods, heavy late-night meals
 - Irregular sleep and dehydration
 - Skipping meds or check-ups\nTrack patterns in a simple diary—awareness leads to kinder choices.`;
@@ -82,19 +143,57 @@ Consult a clinician before new routines, especially if symptoms flare.`;
   return `I hear you. Can you share a bit more about what you need today—diet, exercise, routines, or symptoms? I’ll suggest simple, caring steps.`;
 }
 
-export function ChatbotPanel({ condition, onEarnPoints }: ChatbotPanelProps) {
+export function ChatbotPanel({ conditions, onEarnPoints }: ChatbotPanelProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [speechOn, setSpeechOn] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [surgeryKind, setSurgeryKind] = useState<string>(SURGERY_SUGGESTIONS[0]);
+  const [surgeryKind, setSurgeryKind] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [previousQuestions, setPreviousQuestions] = useState<string[]>([]);
+  const [geminiService, setGeminiService] = useState<any>(null);
   const recRef = useRef<any>(null);
   const areaRef = useRef<HTMLDivElement>(null);
 
+  // Initialize surgery kind when recent_surgery is selected
   useEffect(() => {
-    if (!condition) return;
-    setMessages([{ role: "bot", text: getWarmIntro(condition) }]);
-  }, [condition]);
+    if (conditions.includes("recent_surgery") && !surgeryKind) {
+      setSurgeryKind(SURGERY_SUGGESTIONS[0]);
+    } else if (!conditions.includes("recent_surgery")) {
+      setSurgeryKind("");
+    }
+  }, [conditions, surgeryKind]);
+
+  // Initialize Gemini service
+  useEffect(() => {
+    const service = initGemini();
+    setGeminiService(service);
+  }, []);
+
+  const reinitializeGemini = () => {
+    const service = initGemini();
+    setGeminiService(service);
+  };
+
+  useEffect(() => {
+    if (!conditions || conditions.length === 0) return;
+    
+    const loadIntro = async () => {
+      if (geminiService) {
+        try {
+          const intro = await geminiService.generateWarmIntro(conditions);
+          setMessages([{ role: "bot", text: intro }]);
+        } catch (error) {
+          console.error('Error generating intro:', error);
+          setMessages([{ role: "bot", text: getWarmIntro(conditions) }]);
+        }
+      } else {
+        setMessages([{ role: "bot", text: getWarmIntro(conditions) }]);
+      }
+    };
+
+    loadIntro();
+  }, [conditions, geminiService]);
 
   useEffect(() => {
     if (!areaRef.current) return;
@@ -135,18 +234,36 @@ export function ChatbotPanel({ condition, onEarnPoints }: ChatbotPanelProps) {
     } catch {}
   };
 
-  const ask = (q: string) => {
-    if (!condition) return;
+  const ask = async (q: string) => {
+    if (!conditions || conditions.length === 0) return;
+    
+    setIsLoading(true);
     const userMsg: Msg = { role: "user", text: q };
-    const botText = makeResponse(condition, q, surgeryKind);
-    const botMsg: Msg = { role: "bot", text: botText };
-    setMessages((m) => [...m, userMsg, botMsg]);
-    setInput("");
-    onEarnPoints?.(5);
-    speak(botText);
+    setMessages((m) => [...m, userMsg]);
+    
+    try {
+      // Only pass surgeryKind if recent_surgery is in conditions
+      const relevantSurgeryKind = conditions.includes("recent_surgery") ? surgeryKind : undefined;
+      const botText = await makeGeminiResponse(conditions, q, relevantSurgeryKind, previousQuestions);
+      const botMsg: Msg = { role: "bot", text: botText };
+      setMessages((m) => [...m, botMsg]);
+      setPreviousQuestions(prev => [...prev, q].slice(-10)); // Keep last 10 questions for context
+      onEarnPoints?.(5);
+      speak(botText);
+    } catch (error) {
+      console.error('Error generating response:', error);
+      const fallbackText = "I'm sorry, I'm having trouble responding right now. Please try again or consult your healthcare provider.";
+      const botMsg: Msg = { role: "bot", text: fallbackText };
+      setMessages((m) => [...m, botMsg]);
+    } finally {
+      setIsLoading(false);
+      setInput("");
+    }
   };
 
-  if (!condition) return null;
+  if (!conditions || conditions.length === 0) return null;
+
+  const hasRecentSurgery = conditions.includes("recent_surgery");
 
   return (
     <section className="mt-10">
@@ -165,7 +282,7 @@ export function ChatbotPanel({ condition, onEarnPoints }: ChatbotPanelProps) {
           </div>
         </div>
 
-        {condition === "recent_surgery" && (
+        {hasRecentSurgery && (
           <div className="mb-4">
             <label className="text-sm mb-2 block">What kind of operation did you have recently?</label>
             <Select value={surgeryKind} onValueChange={(v) => setSurgeryKind(v)}>
@@ -198,20 +315,36 @@ export function ChatbotPanel({ condition, onEarnPoints }: ChatbotPanelProps) {
                 </div>
               </div>
             ))}
+            {isLoading && (
+              <div className="text-left">
+                <div className="inline-block px-3 py-2 rounded-lg btn-soft">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </ScrollArea>
 
         <form
           className="mt-4 flex items-center gap-2"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            if (!input.trim()) return toast({ title: "Say something", description: "Type or use the mic to ask a question." });
-            ask(input.trim());
+            if (!input.trim() || isLoading) return toast({ title: "Say something", description: "Type or use the mic to ask a question." });
+            await ask(input.trim());
           }}
         >
-          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask anything..." aria-label="Ask anything" />
-          <Button type="submit" variant="hero">
-            <Send className="h-4 w-4" />
+          <Input 
+            value={input} 
+            onChange={(e) => setInput(e.target.value)} 
+            placeholder="Ask anything..." 
+            aria-label="Ask anything"
+            disabled={isLoading}
+          />
+          <Button type="submit" variant="hero" disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </form>
       </Card>
