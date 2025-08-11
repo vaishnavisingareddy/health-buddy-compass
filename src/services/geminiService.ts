@@ -6,6 +6,7 @@ interface ChatContext {
   surgeryType?: string;
   previousQuestions: string[];
   currentQuestion: string;
+  attachments?: { name: string; type: string; content: string }[];
 }
 
 interface GeminiServiceConfig {
@@ -30,13 +31,15 @@ Key guidelines:
 - Always be warm, empathetic, and supportive
 - Provide specific, actionable advice tailored to their conditions and Indian context
 - Consider Indian climate, traditional foods, and lifestyle patterns
-- Keep responses concise but detailed enough to be helpful (max 150 words)
+- Keep responses concise but detailed enough to be helpful (max 200 words)
+- Use **bold** for important points and *italics* for emphasis
 - Always include a disclaimer that this doesn't replace professional medical advice
 - If asked about diet plans, provide specific Indian meal suggestions and foods to include/avoid
 - If asked about routines, create detailed daily schedules suitable for Indian lifestyle
 - If asked about exercises, suggest safe activities that work in Indian climate/settings
 - Be very specific rather than generic, with Indian cultural context
 - Consider how their multiple conditions might interact
+- Format your response with clear sections using **headers** and bullet points where helpful
 
 Patient context (India-based):
 - Current health conditions: ${conditionNames}`;
@@ -47,6 +50,12 @@ Patient context (India-based):
 
     if (context.previousQuestions.length > 0) {
       systemPrompt += `\n- Previous questions asked: ${context.previousQuestions.join(', ')}`;
+    }
+
+    if (context.attachments && context.attachments.length > 0) {
+      systemPrompt += `\n- Medical documents provided: ${context.attachments.map(a => a.name).join(', ')}`;
+      systemPrompt += `\n- Document contents for reference:\n${context.attachments.map(a => `${a.name}: ${a.content}`).join('\n\n')}`;
+      systemPrompt += `\n\nIMPORTANT: The patient has provided medical documents. Please reference these documents in your response when relevant and provide advice based on the information contained in them. If lab results or previous prescriptions are mentioned, incorporate this information into your recommendations.`;
     }
 
     systemPrompt += `\n\nCurrent question: ${context.currentQuestion}

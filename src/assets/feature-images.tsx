@@ -3,7 +3,7 @@ import React from 'react';
 // Feature illustration components using CSS and icons
 export const AIAssistantIllustration = () => (
   <div className="relative w-full h-48 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-purple-400/20"></div>
+    <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 to-emerald-400/20"></div>
     <div className="relative z-10 text-center">
       <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 mx-auto shadow-lg">
         <span className="text-3xl">🤖</span>
@@ -21,8 +21,8 @@ export const AIAssistantIllustration = () => (
 );
 
 export const CommunityIllustration = () => (
-  <div className="relative w-full h-48 bg-gradient-to-br from-purple-100 to-pink-200 rounded-lg flex items-center justify-center overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-pink-400/20"></div>
+  <div className="relative w-full h-48 bg-gradient-to-br from-green-100 to-emerald-200 rounded-lg flex items-center justify-center overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 to-emerald-400/20"></div>
     <div className="relative z-10 flex items-center space-x-4">
       <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md">
         <span className="text-xl">👩</span>
@@ -89,8 +89,8 @@ export const ResourcesIllustration = () => (
 );
 
 export const WelcomeIllustration = () => (
-  <div className="relative w-full h-64 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 rounded-2xl flex items-center justify-center overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-pink-400/10"></div>
+  <div className="relative w-full h-64 bg-gradient-to-br from-green-100 via-emerald-100 to-teal-100 rounded-2xl flex items-center justify-center overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-br from-green-400/10 via-emerald-400/10 to-teal-400/10"></div>
     <div className="relative z-10 text-center">
       <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 mx-auto shadow-xl">
         <span className="text-4xl">🏥</span>

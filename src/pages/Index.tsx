@@ -330,28 +330,7 @@ const Index = () => {
             </div>
 
             {/* Stats Section */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-12 mx-4">
-              <div className="max-w-4xl mx-auto text-center">
-                <h3 className="text-3xl font-bold text-gray-900 mb-8">Trusted by Thousands</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  <div className="space-y-2">
-                    <div className="text-4xl font-bold text-green-600">10,000+</div>
-                    <div className="text-lg text-gray-600 font-medium">Happy Users</div>
-                    <p className="text-sm text-gray-500">People trust us with their health</p>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-4xl font-bold text-green-600">500+</div>
-                    <div className="text-lg text-gray-600 font-medium">Expert Sessions</div>
-                    <p className="text-sm text-gray-500">Professional consultations completed</p>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-4xl font-bold text-green-600">24/7</div>
-                    <div className="text-lg text-gray-600 font-medium">AI Support</div>
-                    <p className="text-sm text-gray-500">Always available when you need us</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+           
           </div>
         );
     }

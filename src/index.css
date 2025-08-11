@@ -55,9 +55,9 @@ All colors MUST be HSL.
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Brand & gradients */
-    --brand: 16 84% 55%; /* warm coral */
+    --brand: 142 69% 58%; /* soft green */
     --brand-contrast: 0 0% 100%;
-    --accent-soft: 30 100% 96%; /* pastel peach surface */
+    --accent-soft: 142 30% 96%; /* very light green surface */
     --gradient-hero: radial-gradient( circle at var(--pointer-x,50%) var(--pointer-y,50%), hsl(var(--accent) / 0.35), transparent 60%), linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--accent)) );
     --gradient-cta: linear-gradient(135deg, hsl(var(--brand) / 0.95), hsl(var(--accent) / 0.95));
 
@@ -104,9 +104,9 @@ All colors MUST be HSL.
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Brand & gradients (dark) */
-    --brand: 16 84% 62%;
+    --brand: 142 69% 65%; /* softer green for dark mode */
     --brand-contrast: 0 0% 100%;
-    --accent-soft: 20 30% 18%;
+    --accent-soft: 142 30% 18%; /* dark green surface */
     --gradient-hero: radial-gradient( circle at var(--pointer-x,50%) var(--pointer-y,50%), hsl(var(--accent) / 0.25), transparent 60%), linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--accent)) );
     --gradient-cta: linear-gradient(135deg, hsl(var(--brand) / 0.9), hsl(var(--accent) / 0.9));
 

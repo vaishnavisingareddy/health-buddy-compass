@@ -231,7 +231,7 @@ const CommunityPanel: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center space-y-4">
-                <div className="mx-auto w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <div className="mx-auto w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
                   <Users className="h-12 w-12 text-white" />
                 </div>
                 <div>

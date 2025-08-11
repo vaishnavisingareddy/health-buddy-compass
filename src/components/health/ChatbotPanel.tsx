@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Mic, MicOff, Send, Volume2, VolumeX, Loader2 } from "lucide-react";
+import { Mic, MicOff, Send, Volume2, VolumeX, Loader2, Upload, X } from "lucide-react";
 import { ConditionKey } from "./conditions-data";
 import { SURGERY_SUGGESTIONS } from "./conditions-data";
 import { getGeminiService, initializeGeminiService, ChatContext } from "@/services/geminiService";
@@ -15,7 +15,7 @@ interface ChatbotPanelProps {
   onEarnPoints?: (delta: number) => void;
 }
 
-type Msg = { role: "user" | "bot"; text: string };
+type Msg = { role: "user" | "bot"; text: string; attachments?: { name: string; type: string; content: string }[] };
 
 const QUICK_ASK: string[] = [
   "Give me a diet plan for my condition",
@@ -64,7 +64,8 @@ async function makeGeminiResponse(
   conditions: ConditionKey[], 
   input: string, 
   surgeryKind?: string,
-  previousQuestions: string[] = []
+  previousQuestions: string[] = [],
+  attachments?: { name: string; type: string; content: string }[]
 ): Promise<string> {
   console.log('makeGeminiResponse called with:', { conditions, input, surgeryKind });
   const geminiService = getGeminiService();
@@ -82,7 +83,8 @@ async function makeGeminiResponse(
       conditions,
       surgeryType: surgeryKind,
       previousQuestions,
-      currentQuestion: input
+      currentQuestion: input,
+      attachments
     };
 
     console.log('Calling Gemini with context:', context);
@@ -152,8 +154,10 @@ export function ChatbotPanel({ conditions, onEarnPoints }: ChatbotPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [previousQuestions, setPreviousQuestions] = useState<string[]>([]);
   const [geminiService, setGeminiService] = useState<any>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; type: string; content: string }[]>([]);
   const recRef = useRef<any>(null);
   const areaRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize surgery kind when recent_surgery is selected
   useEffect(() => {
@@ -226,7 +230,9 @@ export function ChatbotPanel({ conditions, onEarnPoints }: ChatbotPanelProps) {
   const speak = (text: string) => {
     if (!speechOn) return;
     try {
-      const u = new SpeechSynthesisUtterance(text);
+      // Remove markdown formatting for speech
+      const cleanText = text.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+      const u = new SpeechSynthesisUtterance(cleanText);
       u.rate = 1;
       u.pitch = 1;
       speechSynthesis.cancel();
@@ -234,17 +240,95 @@ export function ChatbotPanel({ conditions, onEarnPoints }: ChatbotPanelProps) {
     } catch {}
   };
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({ 
+          title: "File too large", 
+          description: "Please upload files smaller than 5MB.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!file.type.includes('text') && !file.type.includes('pdf') && !file.type.includes('image')) {
+        toast({ 
+          title: "Unsupported file type", 
+          description: "Please upload text files, PDFs, or images.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        const newFile = {
+          name: file.name,
+          type: file.type,
+          content: content
+        };
+        
+        setUploadedFiles(prev => [...prev, newFile]);
+        toast({ 
+          title: "File uploaded", 
+          description: `${file.name} has been added to your consultation.`
+        });
+      };
+
+      if (file.type.includes('text')) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    toast({ 
+      title: "File removed", 
+      description: "The file has been removed from your consultation."
+    });
+  };
+
+  const formatBotResponse = (text: string): string => {
+    // Convert markdown-style formatting to proper display
+    return text
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') // Bold
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>') // Italic
+      .replace(/\n/g, '<br/>'); // Line breaks
+  };
+
   const ask = async (q: string) => {
     if (!conditions || conditions.length === 0) return;
     
     setIsLoading(true);
-    const userMsg: Msg = { role: "user", text: q };
+    const userMsg: Msg = { 
+      role: "user", 
+      text: q,
+      attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined
+    };
     setMessages((m) => [...m, userMsg]);
     
     try {
       // Only pass surgeryKind if recent_surgery is in conditions
       const relevantSurgeryKind = conditions.includes("recent_surgery") ? surgeryKind : undefined;
-      const botText = await makeGeminiResponse(conditions, q, relevantSurgeryKind, previousQuestions);
+      const botText = await makeGeminiResponse(
+        conditions, 
+        q, 
+        relevantSurgeryKind, 
+        previousQuestions,
+        uploadedFiles.length > 0 ? uploadedFiles : undefined
+      );
       const botMsg: Msg = { role: "bot", text: botText };
       setMessages((m) => [...m, botMsg]);
       setPreviousQuestions(prev => [...prev, q].slice(-10)); // Keep last 10 questions for context
@@ -310,8 +394,22 @@ export function ChatbotPanel({ conditions, onEarnPoints }: ChatbotPanelProps) {
           <div className="space-y-3 pr-2">
             {messages.map((m, idx) => (
               <div key={idx} className={m.role === "user" ? "text-right" : "text-left"}>
-                <div className={m.role === "user" ? "inline-block px-3 py-2 rounded-lg bg-primary text-primary-foreground" : "inline-block px-3 py-2 rounded-lg btn-soft"}>
-                  {m.text}
+                <div className={m.role === "user" ? "inline-block px-3 py-2 rounded-lg bg-primary text-primary-foreground max-w-[80%]" : "inline-block px-3 py-2 rounded-lg btn-soft max-w-[80%]"}>
+                  <div 
+                    dangerouslySetInnerHTML={{ 
+                      __html: m.role === "bot" ? formatBotResponse(m.text) : m.text 
+                    }} 
+                  />
+                  {m.attachments && m.attachments.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {m.attachments.map((file, fileIdx) => (
+                        <div key={fileIdx} className="text-xs opacity-75 flex items-center gap-1">
+                          <Upload className="h-3 w-3" />
+                          {file.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -320,13 +418,61 @@ export function ChatbotPanel({ conditions, onEarnPoints }: ChatbotPanelProps) {
                 <div className="inline-block px-3 py-2 rounded-lg btn-soft">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Thinking...</span>
+                    <span>Analyzing your documents and thinking...</span>
                   </div>
                 </div>
               </div>
             )}
           </div>
         </ScrollArea>
+
+        {/* File Upload Section */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">
+              Upload Medical Reports (Optional)
+            </label>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => fileInputRef.current?.click()}
+              className="text-green-600 border-green-600 hover:bg-green-50"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Add Files
+            </Button>
+          </div>
+          
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".txt,.pdf,.doc,.docx,.jpg,.jpeg,.png"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+
+          {uploadedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {uploadedFiles.map((file, index) => (
+                <div key={index} className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
+                  <Upload className="h-3 w-3" />
+                  <span className="max-w-[100px] truncate">{file.name}</span>
+                  <button
+                    onClick={() => removeFile(index)}
+                    className="text-green-600 hover:text-green-800"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <p className="text-xs text-gray-500 mb-3">
+            Upload previous prescriptions, lab reports, or consultation notes for more personalized advice. Max 5MB per file.
+          </p>
+        </div>
 
         <form
           className="mt-4 flex items-center gap-2"
